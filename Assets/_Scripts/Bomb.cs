@@ -2,18 +2,23 @@
 using System.Collections;
 
 public class Bomb : MonoBehaviour {
-    
-    Player player;
+
+    PlayerController player;
     Rigidbody2D rb;
-    BoxCollider2D bc;
+    BoxCollider2D bc2D;
     DestroyablePlatform dp = null;
+
+    void Start()
+    {
+        player = Singletons.playerInstance;
+    }
 
     public void LightTheFuse(DestroyablePlatform bs)
     {
         dp = bs;
         rb = GetComponent<Rigidbody2D>();
-        bc = GetComponent<BoxCollider2D>();
-        bc.isTrigger = false;
+        bc2D = GetComponent<BoxCollider2D>();
+        bc2D.isTrigger = false;
         rb.isKinematic = false;
         bs.SetTimer();
         Invoke("Explode", 3);
@@ -30,7 +35,6 @@ public class Bomb : MonoBehaviour {
         //Debug.Log("trigger " + this);
         if (other.gameObject.name == "Player" && dp == null)
         {
-            player = other.gameObject.GetComponent<Player>();   //replace this with singleton pattern reference to player
             if (!player.hasBomb)
             {
                 player.PickUpABomb();

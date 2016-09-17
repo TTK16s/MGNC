@@ -1,15 +1,15 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class Player : MonoBehaviour {
 
+public class PlayerController : MonoBehaviour {
+    
     public GameObject bombPrefab;
     GameObject litBomb;
 
     MovingPlatform movingPlatform;
 
     Rigidbody2D rb;
-    BoxCollider2D playerColl;
 
     public LayerMask playerMask;
 
@@ -34,20 +34,31 @@ public class Player : MonoBehaviour {
     public DestroyablePlatform bombSite = null;
 
     public bool standingOnMovingPlatform = false;
-    
-	void Start ()
+
+    void Awake()
     {
+        if (Singletons.playerInstance != null)
+        {
+            Destroy(Singletons.playerInstance);
+        }
+
+        Singletons.playerInstance = this;
+    }
+
+    void Start()
+    {
+
         rb = GetComponent<Rigidbody2D>();
         startingPosition = transform.position;
 
         Physics2D.IgnoreLayerCollision(8, 20);  //ignore collision with bombs. 8 = player, 20 = bomb
-	}
+    }
 
     void Update()
     {
+        leftGroundInfo = RaycastGround(transform.position);
+        rightGroundInfo = RaycastGround(transform.position);
 
-        leftGroundInfo = RaycastGround();
-        rightGroundInfo = RaycastGround();
         if (leftGroundInfo.collider != null || rightGroundInfo.collider != null)
         {
             if (leftGroundInfo.collider.gameObject.layer == 10 || rightGroundInfo.collider.gameObject.layer == 10)  // 10 = MovingPlatform Layer
@@ -68,7 +79,7 @@ public class Player : MonoBehaviour {
         {
             if (movingPlatform == null)
             {
-                movingPlatform = RaycastGround().collider.gameObject.GetComponent<MovingPlatform>();
+                movingPlatform = RaycastGround(transform.position).collider.gameObject.GetComponent<MovingPlatform>();
             }
 
             transform.Translate(movingPlatform.dir * Time.deltaTime * movingPlatform.speed);
@@ -109,10 +120,9 @@ public class Player : MonoBehaviour {
 
     }
 
-    public RaycastHit2D RaycastGround()
+    public RaycastHit2D RaycastGround(Vector3 point)
     {
-        RaycastHit2D hitInfo = Physics2D.Raycast(transform.position, Vector3.down, 1f, playerMask);
-
+        RaycastHit2D hitInfo = Physics2D.Raycast(point, Vector3.down, 1f, playerMask);
         return hitInfo;
     }
 
@@ -155,8 +165,8 @@ public class Player : MonoBehaviour {
     void Reset()
     {
         transform.position = startingPosition;
-        hasBomb = false;
-        hasKey = false;
+        hasBomb = false;    //replace these
+        hasKey = false;     //with "reset inventory"
         Debug.Log("player reseted");
     }
 

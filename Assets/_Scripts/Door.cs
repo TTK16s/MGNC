@@ -3,7 +3,12 @@ using System.Collections;
 
 public class Door : MonoBehaviour {
 
-    Player player;
+    PlayerController player;
+
+    void Start()
+    {
+        player = Singletons.playerInstance;
+    }
 
     public void Open()
     {
@@ -15,7 +20,6 @@ public class Door : MonoBehaviour {
         //Debug.Log("trigger enter " + this);
         if (coll.gameObject.name == "Player")
         {
-            player = coll.gameObject.GetComponent<Player>();
             player.nearbyDoor = this;
         }
     }

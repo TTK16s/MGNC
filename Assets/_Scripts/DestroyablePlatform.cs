@@ -3,19 +3,13 @@ using System.Collections;
 
 public class DestroyablePlatform : MonoBehaviour {
 
-    Player player;
-
-	// Use this for initialization
-	void Start () {
-	
+    PlayerController player;
+    
+	void Start ()
+    {
+        player = Singletons.playerInstance;
 	}
 	
-	// Update is called once per frame
-	void Update () {
-	
-	}
-
-
     public void SetTimer()
     {
         Invoke("Explode", 3);
@@ -31,7 +25,7 @@ public class DestroyablePlatform : MonoBehaviour {
         //Debug.Log("collision stay " + this);
         if (coll.gameObject.name == "Player")
         {
-            player = coll.gameObject.GetComponent<Player>();
+            //player = coll.gameObject.GetComponent<PlayerController>();
             player.bombSite = this;
             player.onBombSite = true;
         }

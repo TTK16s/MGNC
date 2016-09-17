@@ -34,7 +34,7 @@ public class PlayerController : MonoBehaviour {
     public DestroyablePlatform bombSite = null;
 
     public bool standingOnMovingPlatform = false;
-
+    
     void Awake()
     {
         if (Singletons.playerInstance != null)
@@ -169,5 +169,6 @@ public class PlayerController : MonoBehaviour {
         hasKey = false;     //with "reset inventory"
         Debug.Log("player reseted");
     }
+    
 
 }

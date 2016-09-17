@@ -9,6 +9,7 @@ public class Box : MonoBehaviour {
     RaycastHit2D groundInfo;
     
 
+
 	// Use this for initialization
 	void Start () {
 	
@@ -27,5 +28,21 @@ public class Box : MonoBehaviour {
                 transform.Translate(movingPlatform.dir * Time.deltaTime * movingPlatform.speed);
             }
         }
+    }
+
+    void OnCollisionEnter2D(Collision2D coll)
+    {
+        if (coll.gameObject.name == "Box 2")
+        {
+            Debug.Log("you win");
+            coll.gameObject.GetComponent<Box>().Explode();
+            Explode();
+        }
+        
+    }
+
+    public void Explode()
+    {
+        Destroy(this.gameObject);
     }
 }

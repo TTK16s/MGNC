@@ -1,9 +1,13 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class Door : MonoBehaviour {
+public class Door : Item {
 
     PlayerController player;
+
+    public bool hasColorCode = false;
+    public enum CodeColor { GENERIC, BLUE, YELLOW, RED }
+    public CodeColor colorCode;
 
     void Start()
     {
@@ -12,26 +16,31 @@ public class Door : MonoBehaviour {
 
     public void Open()
     {
-        this.gameObject.SetActive(false);
-    }
-
-    void OnCollisionEnter2D(Collision2D coll)
-    {
-        //Debug.Log("trigger enter " + this);
-        if (coll.gameObject.name == "Player")
+        if (CheckPlayerForColorCodedKey())
         {
-            player.nearbyDoor = this;
+            gameObject.SetActive(false);
+            player.ProcessItem(this);
         }
     }
 
-    void OnCollisionExit2D(Collision2D coll)
+    bool CheckPlayerForColorCodedKey()
     {
-        //Debug.Log("trigger enter " + this);
-        if (coll.gameObject.name == "Player")
-        {
-            player.nearbyDoor = null;
-        }
+        bool canihasthekey = false;
+
+        if (colorCode == CodeColor.BLUE && player.blueKey == true)
+            canihasthekey = true;
+        else if (colorCode == CodeColor.YELLOW && player.yellowKey == true)
+            canihasthekey = true;
+        else if (colorCode == CodeColor.RED && player.redKey == true)
+            canihasthekey = true;
+        else if (colorCode == CodeColor.GENERIC)
+            canihasthekey = true;
+
+            return canihasthekey;
+    } 
+
+    public override void Reset()
+    {
+        gameObject.SetActive(true);
     }
-
-
 }

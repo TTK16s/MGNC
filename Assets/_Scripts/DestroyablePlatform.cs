@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class DestroyablePlatform : MonoBehaviour {
+public class DestroyablePlatform : Item {
 
     PlayerController player;
     
@@ -17,27 +17,13 @@ public class DestroyablePlatform : MonoBehaviour {
 
     void Explode()
     {
-        Destroy(this.gameObject);
+        player.ProcessItem(this);
+        gameObject.SetActive(false);
     }
-
-    void OnCollisionStay2D(Collision2D coll)
+    
+    public override void Reset()
     {
-        //Debug.Log("collision stay " + this);
-        if (coll.gameObject.name == "Player")
-        {
-            //player = coll.gameObject.GetComponent<PlayerController>();
-            player.bombSite = this;
-            player.onBombSite = true;
-        }
-    }
-
-    void OnCollisionExit2D(Collision2D coll)
-    {
-        if (coll.gameObject.name == "Player")
-        {
-            player.bombSite = null;
-            player.onBombSite = false;
-        }
+        gameObject.SetActive(true);
     }
 
 }

@@ -1,49 +1,60 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-public class Bomb : MonoBehaviour {
+public class Bomb : Item {
 
     PlayerController player;
-    Rigidbody2D rb;
-    BoxCollider2D bc2D;
+    public Rigidbody2D rb;
+    public CircleCollider2D col;
     DestroyablePlatform dp = null;
 
     void Start()
     {
+        typeString = "Bomb";
+        itemName = gameObject.name;
         player = Singletons.playerInstance;
-    }
-
-    public void LightTheFuse(DestroyablePlatform bs)
-    {
-        dp = bs;
-        rb = GetComponent<Rigidbody2D>();
-        bc2D = GetComponent<BoxCollider2D>();
-        bc2D.isTrigger = false;
-        rb.isKinematic = false;
-        bs.SetTimer();
-        Invoke("Explode", 3);
-        //Debug.Log("fuse set");
-    }
-
-    void Explode()
-    {
-        Destroy(this.gameObject);
     }
 
     void OnTriggerEnter2D(Collider2D other)
     {
-        //Debug.Log("trigger " + this);
-        if (other.gameObject.name == "Player" && dp == null)
+        if (other.gameObject.name == "Player")
         {
-            if (!player.hasBomb)
-            {
-                player.PickUpABomb();
-                Destroy(this.gameObject);
-            }
+            player.ProcessItem(this);
+            gameObject.SetActive(false);
         }
     }
 
+    public void SetUpABomb()
+    {
+        // all your base are belong to us
+        rb = GetComponent<Rigidbody2D>();
+        col = GetComponent<CircleCollider2D>();
 
+        gameObject.SetActive(false);
+    }
+
+    public void LightTheFuse(DestroyablePlatform bs, Vector3 pos)
+    {
+        transform.position = pos;
+        gameObject.SetActive(true);
+        dp = bs;
+
+        col.isTrigger = false;
+        rb.isKinematic = false;
+        bs.SetTimer();
+        Invoke("Explode", 3);
+    }
+
+    void Explode()
+    {
+        gameObject.SetActive(false);
+    }
+    
+    public override void Reset()
+    {
+        gameObject.SetActive(true);
+        itemUsed = false;
+    }
 }
 
 

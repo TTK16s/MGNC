@@ -1,63 +1,140 @@
 ﻿using UnityEngine;
+using System;
 using System.Collections;
+using System.Collections.Generic;
 
+
+public class Level
+{
+    public List<Item> items = new List<Item>();
+
+
+    public void Reset()
+    {
+        foreach(Item i in items)
+        {
+            i.Reset();
+            
+        }
+        items.Clear();
+    }
+}
+public class Inventory
+{
+    public List<Item> items = new List<Item>();
+
+    public bool CheckFor(string neededItem)
+    {
+        bool itemFound = false;
+
+        foreach(Item i in items)
+        {
+            if (i.typeString == neededItem && i.itemUsed == false)
+            {
+                itemFound = true;
+            }
+        }
+        return itemFound;
+    }
+
+    public void Reset()
+    {
+        Debug.Log("inventory reset");
+        items.Clear();
+    }
+}
 
 public class PlayerController : MonoBehaviour {
-    
-    public GameObject bombPrefab;
-    GameObject litBomb;
+
+    public LayerMask groundMask;
+    public LayerMask itemMask;
+
+    public LayerMask doorMask;
+    public LayerMask explodingPlatformMask;
+
+    public enum State       { IDLE, RUN, JUMP, FALL, PUSHING }
+
+    public enum Direction   { RIGHT, LEFT }
+
+    public State playerState = State.IDLE;
+    public Direction playerDir = Direction.RIGHT;
+
+    public GameObject bombPrefab;   //probably works
+    Bomb bomb;
+
+    Level currentLevel = new Level();
+    Inventory inventory = new Inventory();
+
+    Rigidbody2D rb;
+    SpriteRenderer playerRenderer;
+    Animator playerAnimator;
 
     MovingPlatform movingPlatform;
 
-    Rigidbody2D rb;
-
-    public LayerMask playerMask;
-
+    RaycastHit2D wallInfo;
     RaycastHit2D leftGroundInfo;
     RaycastHit2D rightGroundInfo;
 
-    Vector3 position;       // make the input/player movement to work on using separate vector3 that we use to set transform.position
-                            // and utilize raycast to determine if we are grounded, not grounded etc: 
-
     Vector3 startingPosition;
+    Vector3 direction;
+    Vector3 horizontalMovement;
 
-    public float speed;
+    float xVelocity;
+
+    public float runSpeed;
     public float jumpForce;
 
-    public bool hasBomb = false;
-    public bool hasKey = false;
-
-    public bool nearDoor = false;
-    public bool onBombSite = false;
-
-    public Door nearbyDoor = null;
-    public DestroyablePlatform bombSite = null;
+    public bool hasJumped = false;
 
     public bool standingOnMovingPlatform = false;
+
+    public bool blueKey;
+    public bool yellowKey;
+    public bool redKey;
+
+    public float jumpTime;
+    public float jumpTimer;
     
     void Awake()
     {
         if (Singletons.playerInstance != null)
         {
-            Destroy(Singletons.playerInstance);
+            Destroy(Singletons.playerInstance.gameObject);
         }
-
         Singletons.playerInstance = this;
     }
 
     void Start()
     {
-
         rb = GetComponent<Rigidbody2D>();
-        startingPosition = transform.position;
+        playerRenderer = GetComponent<SpriteRenderer>();
+        playerAnimator = GetComponent<Animator>();
 
-        Physics2D.IgnoreLayerCollision(8, 20);  //ignore collision with bombs. 8 = player, 20 = bomb
+        startingPosition = transform.position;
+        direction = Vector3.right;  //ota talteen alku suunta resettejä varten?
+
+        GameObject superHandle = Instantiate(bombPrefab, new Vector3(0, 0, -20), Quaternion.identity) as GameObject;
+        //bomb = Instantiate(bombPrefab, new Vector3(0, 0, -20), Quaternion.identity) as GameObject;
+        bomb = superHandle.GetComponent<Bomb>();
+        bomb.SetUpABomb();
+        //bomb.GetComponent<Bomb>().SetUpABomb();
+
     }
+    
+    void OnGUI()
+    {
+        GUI.Label(new Rect(10, 10, 100, 20), "player X: " + xVelocity.ToString("#.00"));
+        GUI.Label(new Rect(10, 30, 100, 20), "player y: " + rb.velocity.y.ToString("#.00"));
+    }
+    
 
     void Update()
     {
-        leftGroundInfo = RaycastGround(transform.position);
-        rightGroundInfo = RaycastGround(transform.position);
+        //mitä vitun paskaa
+
+        wallInfo = RayCastWall(transform.position);
+        leftGroundInfo = RayCastGround(transform.position);
+        rightGroundInfo = RayCastGround(transform.position);
 
         if (leftGroundInfo.collider != null || rightGroundInfo.collider != null)
         {
@@ -79,7 +156,7 @@ public class PlayerController : MonoBehaviour {
         {
             if (movingPlatform == null)
             {
-                movingPlatform = RaycastGround(transform.position).collider.gameObject.GetComponent<MovingPlatform>();
+                movingPlatform = RayCastGround(transform.position).collider.gameObject.GetComponent<MovingPlatform>();
             }
 
             transform.Translate(movingPlatform.dir * Time.deltaTime * movingPlatform.speed);
@@ -89,86 +166,211 @@ public class PlayerController : MonoBehaviour {
         {
             movingPlatform = null;
         }
+        //oikeesti
 
-        //rework all this to support crossplatform input manager and to work by using raycasts
-        #region input
-        if (Input.GetKey(KeyCode.LeftArrow))
+        xVelocity = Input.GetAxis("Horizontal");
+        playerAnimator.SetFloat("X", Mathf.Abs(xVelocity));
+
+        if (xVelocity > 0 && wallInfo.collider == null)  //voi tiivistää yhteen iffiin josta saadaan vaan mathf.abs ja katsotaan suuntaa sitten erikseen
         {
-            transform.Translate(-Vector3.right * Time.deltaTime * speed);
+            playerState = State.RUN;
+            playerAnimator.SetBool("Pushing", false);
+            GetDirection(xVelocity);
         }
-        if (Input.GetKey(KeyCode.RightArrow))
+        else if (xVelocity < 0 && wallInfo.collider == null)
         {
-            transform.Translate(Vector3.right * Time.deltaTime * speed);
+            playerState = State.RUN;
+            playerAnimator.SetBool("Pushing", false);
+            GetDirection(xVelocity);
         }
-        if (Input.GetKeyDown(KeyCode.UpArrow))
+
+        switch (playerState)
         {
-            rb.velocity = new Vector3(0, jumpForce, 0);
+            case State.IDLE:
+                playerAnimator.SetBool("Pushing", false);
+                break;
+            case State.RUN:
+                //playerAnimator.SetBool("Pushing", false);
+                break;
+            case State.JUMP:
+                playerAnimator.SetBool("Pushing", false);
+                //playerAnimator.SetTrigger("JumpTrigger");
+                break;
+            case State.FALL:
+                playerAnimator.SetBool("Pushing", false);
+
+                break;
+            case State.PUSHING:
+                playerAnimator.SetBool("Pushing", true);
+                break;
+            default:
+                break;
         }
-        if (Input.GetKeyDown(KeyCode.DownArrow))
+        switch (playerDir)
         {
-            if (nearbyDoor != null && hasKey)
-                OpenDoor(nearbyDoor);
-
-            if (onBombSite && hasBomb)
-                PlaceABomb(bombSite);
-
-            //do actions specific to place we stand in
-            // DropABomb(); or  OpenADoor();
+            case Direction.RIGHT:
+                playerRenderer.flipX = false;
+                direction = Vector3.right;
+                break;
+            case Direction.LEFT:
+                playerRenderer.flipX = true;
+                direction = Vector3.left;
+                break;
         }
-        #endregion
 
+        jumpTimer = jumpTimer + Time.deltaTime *1.1f;
+        if (Input.GetKey(KeyCode.UpArrow))
+        {
+            if (!hasJumped)
+            {
+                //Debug.Log("lol");
+                jumpTimer = 0f;
+                hasJumped = true;
+            }
+            Jump();
+        }
 
+        if (rb.velocity.y < 0)
+        {
+            playerAnimator.SetTrigger("FallTrigger");
+            Invoke("ResetFallTrigger", 0.1f);
+        }
+        
+        if (Input.GetKey(KeyCode.DownArrow))
+        {
+            Action();
+        }
+
+        horizontalMovement.x = Input.GetAxis("Horizontal") *Time.deltaTime * runSpeed;
+        transform.Translate(horizontalMovement);
     }
 
-    public RaycastHit2D RaycastGround(Vector3 point)
+    void GetDirection(float x)
     {
-        RaycastHit2D hitInfo = Physics2D.Raycast(point, Vector3.down, 1f, playerMask);
+        if (x > 0)
+        {
+            playerDir = Direction.RIGHT;
+        }
+        else if (x < 0)
+        {
+            playerDir = Direction.LEFT;
+        }
+    }
+
+    void Jump()
+    {
+        playerAnimator.SetTrigger("JumpTrigger");
+        Invoke("ResetJumpTrigger", 0.1f);
+        if (jumpTimer < jumpTime)
+        {
+            rb.velocity = (new Vector2(0, jumpForce));
+        }
+    }
+
+    void ResetJumpTrigger()
+    {
+        playerAnimator.ResetTrigger("JumpTrigger");
+    }
+    void ResetLandingTrigger()
+    {
+        playerAnimator.ResetTrigger("LandingTrigger");
+    }
+    void ResetFallTrigger()
+    {
+        playerAnimator.ResetTrigger("FallTrigger");
+    }
+
+    void Action()
+    {
+        Door nearbyDoor;
+        DestroyablePlatform bombSite;
+
+        if (Physics2D.OverlapCircle(transform.position, 0.7f, explodingPlatformMask) != null)
+        {
+            bombSite = Physics2D.OverlapCircle(transform.position, 1f, itemMask).GetComponent<DestroyablePlatform>();
+            if (inventory.CheckFor("Bomb"))
+            {
+                bomb.LightTheFuse(bombSite, transform.position);
+            }
+            else
+            {
+                Debug.Log("no bomb found"); //play some error noise here 
+            }
+        }
+        else if (Physics2D.OverlapCircle(transform.position, 0.7f, doorMask) != null)
+        {
+            nearbyDoor = Physics2D.OverlapCircle(transform.position, 0.7f, itemMask).GetComponent<Door>();
+            //if right kind of key  -> if the key fits -> mark the key as used
+            if (inventory.CheckFor("Key"))   //pass key color as parameter?
+            {
+                nearbyDoor.Open();
+            }
+            else
+            {
+                Debug.Log("No key Found");  //play some error noise here
+            }
+        }
+    }
+
+    public RaycastHit2D RayCastGround(Vector3 point)
+    {
+        RaycastHit2D hitInfo = Physics2D.Raycast(point, Vector3.down, 0.55f, groundMask);
+        Debug.DrawLine(point, (point + new Vector3(0,-0.5f,0)), Color.green);
+        if (hitInfo.transform != null)
+        {
+            if (hitInfo.transform.gameObject.layer == 9|| hitInfo.transform.gameObject.layer == 10)
+            {
+                hasJumped = false;
+                playerAnimator.SetTrigger("LandingTrigger");
+                Invoke("ResetLandingTrigger", 0.1f);
+            }
+        }
+        return hitInfo;
+    }
+    public RaycastHit2D RayCastWall(Vector3 point)
+    {
+        Debug.DrawLine(point, (point + new Vector3(-0.25f, 0, 0)), Color.red);
+        RaycastHit2D hitInfo = Physics2D.Raycast(point, direction, 0.25f, groundMask);
+        if (hitInfo.transform !=null)
+        {
+            Debug.Log("lol");
+            playerState = State.PUSHING;
+        }
+        else
+        {
+            playerState = State.IDLE;
+        }
         return hitInfo;
     }
 
-    public void PickUpABomb()   //allow player to carry more than one bomb at a time?
+    public void ProcessItem(Item i)
     {
-        hasBomb = true;
-    }
-
-    public void PickUpAKey()    //pass the key color as parameter?
-    {
-        hasKey = true;
-    }
-
-    void performAction()
-    {
-        //use this to call DropABomB and OpenADoor Methods
-    }
-
-    public void PlaceABomb(DestroyablePlatform bs)
-    {
-        //when at a bombsite, drops bomb on the site
-        litBomb = Instantiate(bombPrefab, transform.position, Quaternion.identity) as GameObject;
-        litBomb.GetComponent<Bomb>().LightTheFuse(bs);
-        hasBomb = false;
-    }
-
-    public void OpenDoor(Door door)
-    {
-        door.Open();
-        hasKey = false;
+        currentLevel.items.Add(i);
+        if (i.itemName == "Key")
+        {
+            inventory.items.Add(i);
+        }
+        if (i.itemName == "Bomb")
+        {
+            inventory.items.Add(i);
+        }
     }
 
     public void Perish()
     {
-        //reset player to start
-        //reset the level? keys, enemies, bombs etc
+        currentLevel.Reset();
+        inventory.Reset();
         Reset();
     }
 
     void Reset()
     {
         transform.position = startingPosition;
-        hasBomb = false;    //replace these
-        hasKey = false;     //with "reset inventory"
+        blueKey = false;
+        yellowKey = false;
+        redKey = false;
         Debug.Log("player reseted");
     }
-    
+
 
 }
